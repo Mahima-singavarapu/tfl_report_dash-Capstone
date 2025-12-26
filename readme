@@ -1,0 +1,161 @@
+Description from TFL (London Underground Performance Reports)
+The key measures of underground performance contained in the Excel spreadsheet are: Total operated kilometres, Total number of lost customer hours (LCH) (all causes), Average excess journey time, and Percentage of scheduled operated.
+
+More indicators are available from the TFL monthly performance data Almanac.
+
+Also available from TFL are a list of tube stations containing passenger entry and exit statistics.
+
+London Underground conducts surveys each year. We count the number of people using our service, where they travel to and from and how long their journeys last.
+
+TFL also monitor performance and assets, measuring how far trains have travelled and how many trains, lifts and escalators are in service.
+
+TFL are committed to providing passengers with details of how well the network is working and regularly publish a performance update. This is updated every four weeks - defined as a period - and gives figures for a range of service and network-related matters.
+
+The following information is provided on the TfL website:
+
+1) A PDF report of the latest periods performance 2) Spreadsheet reports (almanac) of historic performance data dating back to 2002
+
+There are also links to other reports of interest (station entry/exit figures, Tube upgrade plan and Quarterly Investment Programme reports).
+
+This data package is similar to the information previously made available on the Datastore as part of a London Assembly Scrutiny investigation in 2011.
+
+This project uses dataset from https://data.london.gov.uk/dataset/london-underground-performance-reports-em8qy/ called London Underground Performance Data. Key tube performance data from TFL. The key measures chosen for this spreadsheet are: Total Operated Kilometres, Total number of lost customer hours (all causes), Average excess journey time, and % of Scheduled Operated. More indicators are available from the TFL monthly performance data Almanac.
+
+The publisher is TFL. This dataset is created in April 2019.
+
+The TFL reporting period is 4 weeks.
+
+There are a few plots in the downloaded dataset excel sheet, the plots are deleted and the data is loaded into PowerQuery.
+
+This project analyses London Underground operational performance and passenger impact using publicly available data from Transport for London (TfL).
+The dashboard is designed to replicate a real-world UK public sector data analyst deliverable, focusing on service reliability, disruption impact, and long-term performance trends.
+
+TfL reports Underground performance in fixed four-week reporting periods. This project accounts for that structure and builds custom period-based time intelligence to ensure accurate analysis.
+
+Dataset explanation:
+
+We have 10 columns and 119 rows.
+
+Period and Financial year: has the period number and the financial year short form separated by underscore
+Reporting Period: This is a separate column for reporting period only
+Days in period: This gives the number of days the period has (reporting time of TFL 4 weeks -> 4*7 = 28)
+Period ending: The ending date of the period 
+Month: The next column days month but  its the same period ending column
+Number of Lost Customer Hours: This statistic shows the amount of customer hours lost due to disruptions of two minutes or more. TfL calculates the Lost Customer Hours (LCH) measure as an indication of the direct impact for our passengers when services on our network are disrupted. The calculation of LCH is significantly affected by demand and travel pattern data, and in 2019 TfL updated our calculation methodology to reflect the latest data we have available (until 2019 LCH calculations have been based on data from 2008). Therefore it is not a like for like comparison between the LCH for 19/20 and the previously published figures for prior years. TfL is working towards republishing the old data using the new calculations to enable like for like comparisons.
+Operated Kms (Peak and Off Peak): Total Operated Kilometres
+% of Scheduled Operated: The percentage of planned train services (kilometres) that actually operated as scheduled during a reporting period.
+Excess Journey Time (mins): The extra time taken for travel (delay)
+
+
+Data Preparation:
+
+There was an extra null column, it has been removed.
+
+There were 3 null rows at the bottom, they've been removed. Now the total number of rows is 116.
+
+The first column has both period and financial year, the column values are split with delimiter '_' and the column which has the final year values has been renamed financial year and after close inspection the period column created after the splitting is deleted as it has same values as reporting period column.
+
+From the period ending column a new column period starting has been derived as (period ending - 27) using subtract days.
+
+Now the month column which basically has the same values as period ending should contain only the month value, so only the month number has been extracted and placed as second column beside the financial year.
+
+For the Number of Lost customer hours and Excess journey time there is a text in the last row saying 'Not applicable due to COVID-19'. This is replaced with blanks so that the column can be converted to fixed decimal.
+
+All the other 4 columns Number of Lost Customer Hours, Operated Kilometeres, % of Scheduled operated and Excess journey time have been converted to decimal number.
+
+Created another column with full year for financial year.
+"20" & Text.Start([Financial Year], 2) & "-" & "20" & Text.End([Financial Year], 2)
+
+I've removed the financial year column and put only the financial year full column which has the complete year value separated with hyphen.
+
+Now the final dataset has 10 columns and 116 rows.
+
+For the Lost customer hours dataset, there are 14 columns and 17 rows, The first column is the financial year and rest of the 13 columns is 13 period values, I've made these columns as decimal data types.
+
+For the financial year column I've changed the '/' to '-'.
+
+Renamed the datasets to 
+
+Key trends as Fact_Performance
+
+Lost customer Hours as Fact_LCH_History
+
+Now in the report  view:
+
+Measures:
+
+Created required measures for the decimal columns, totals and averages
+
+Total LCH = SUM(
+    Fact_Performance[Number of Lost Customer Hours]
+)
+
+Total Operated KMs = SUM(
+    Fact_Performance[Operated Kms (Peak and Off Peak)]
+)
+
+Avg Excess Journey Time = AVERAGE(
+    Fact_Performance[Excess Journey Time (mins)]
+)
+
+Avg % Scheduled Operated = AVERAGE(
+    Fact_Performance[% of Scheduled Operated]
+)
+
+
+The LCH is normalised with LCH per million in kms:
+
+LCH per Million KM =
+DIVIDE (
+    [Total LCH],
+    [Total Operated KMs] / 1000000
+)
+
+
+The period over period change:
+
+LCH PoP Change = 
+[Total LCH]
+- CALCULATE (
+    [Total LCH],
+    PREVIOUSMONTH ( Fact_Performance[Period starting] )
+)
+
+Service Reliability Index:
+
+Service Reliability Index = 
+DIVIDE (
+    [Avg % Scheduled Operated],
+    [Avg Excess Journey Time]
+)
+
+Performance Flag:
+
+Performance Status =
+SWITCH (
+    TRUE(),
+    [LCH per Million KM] > 50000, "High Disruption",
+    [LCH per Million KM] > 30000, "Moderate",
+    "Normal"
+)
+
+LCH per Day =
+DIVIDE ( [Total LCH], SUM ( Fact_LU_Performance[Days_in_Period] ) )
+
+% Scheduled Operated PoP =
+[Avg % Scheduled Operated]
+- CALCULATE (
+    [Avg % Scheduled Operated],
+    PREVIOUSMONTH ( Dim_Period[Period_Start_Date] )
+)
+
+
+For trend flag:
+% Scheduled Operated Trend =
+SWITCH (
+    TRUE(),
+    [% Scheduled Operated PoP] > 0, 1,
+    [% Scheduled Operated PoP] < 0, -1,
+    0
+)
+
